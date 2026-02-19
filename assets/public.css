@@ -1,0 +1,14 @@
+.srp-register-wrap{max-width:720px;margin:24px auto;padding:18px 18px 8px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+.srp-register-wrap .woocommerce-message,.srp-register-wrap .woocommerce-error{margin-bottom:14px}
+.srp-register-form label{display:block;font-weight:600;margin:0 0 6px}
+.srp-register-form input,.srp-register-form select,.srp-register-form textarea{width:100%;padding:10px 12px;border:1px solid rgba(0,0,0,.16);border-radius:10px;background:#fff}
+.srp-register-form textarea{resize:vertical}
+.srp-register-form input:focus,.srp-register-form select:focus,.srp-register-form textarea:focus{outline:none;box-shadow:0 0 0 3px rgba(0,0,0,.06)}
+.srp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.srp-grid .srp-full{grid-column:1 / -1}
+.srp-register-form p{margin:0}
+.srp-actions{margin-top:14px}
+.srp-actions .button{width:100%;padding:12px 14px;border-radius:12px}
+.srp-register-wrap input, .srp-register-wrap textarea, .srp-register-wrap select { border-radius: 3px !important; } 
+.srp-register-wrap .srp-actions button { margin: 20px 0px 25px 0px; border-radius: 3px; }
+@media (max-width:640px){.srp-grid{grid-template-columns:1fr}}
