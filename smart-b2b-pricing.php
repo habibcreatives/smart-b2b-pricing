@@ -9,7 +9,7 @@
  * WC requires at least: 8.1
  * WC tested up to: 10.4
  * Author: Adnan Habib
- * Author URI: http://freelancer.com/u/csehabiburr183
+ * Author URI: https://freelancer.com/u/csehabiburr183
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: srp
