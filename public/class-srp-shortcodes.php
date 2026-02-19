@@ -112,7 +112,7 @@ class SRP_Shortcodes {
         ob_start();
 
         if ($success) {
-            echo '<div class="woocommerce-message">' . esc_html__('Registration complete. Your business account is pending approval. You can browse retail prices now; wholesale prices will appear after approval.', 'srp') . '</div>';
+            echo '<div class="woocommerce-message" style="text-align:center">' . esc_html__('Registration complete. Your business account is pending approval. You can browse retail prices now; wholesale prices will appear after approval.', 'srp') . '</div>';
         }
 
         if (!empty($errors)) {
@@ -136,38 +136,38 @@ class SRP_Shortcodes {
 
         echo '<p>'
             . '<label>' . esc_html__('First Name', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="first_name" autocomplete="given-name" required placeholder="' . esc_attr__('First name', 'srp') . '" />'
+            . '<input type="text" name="first_name" autocomplete="given-name" required/>'
             . '</p>';
 
         echo '<p>'
             . '<label>' . esc_html__('Last Name', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="last_name" autocomplete="family-name" required placeholder="' . esc_attr__('Last name', 'srp') . '" />'
+            . '<input type="text" name="last_name" autocomplete="family-name" required />'
             . '</p>';
 
         echo '<p class="srp-full">'
             . '<label>' . esc_html__('Email Address', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="email" name="email" autocomplete="email" required placeholder="hello@company.com" />'
+            . '<input type="email" name="email" autocomplete="email" required/>'
             . '</p>';
 
         echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Company', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="company" required placeholder="' . esc_attr__('Company name', 'srp') . '" />'
+            . '<label>' . esc_html__('Company Name', 'srp') . ' <span class="required">*</span></label>'
+            . '<input type="text" name="company" required/>'
             . '</p>';
 
         echo '<p class="srp-full">'
             . '<label>' . esc_html__('Address', 'srp') . ' <span class="required">*</span></label>'
-            . '<textarea name="address" rows="2" required placeholder="' . esc_attr__('Street, City, State, Zip Code', 'srp') . '"></textarea>'
+            . '<textarea name="address" rows="2" required></textarea>'
             . '</p>';
 
         echo '<p>'
             . '<label>' . esc_html__('Contact Phone', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="contact_phone" required placeholder="' . esc_attr__('Phone number', 'srp') . '" />'
+            . '<input type="text" name="contact_phone" required/>'
             . '</p>';
 
         echo '<p>'
             . '<label>' . esc_html__('Country', 'srp') . ' <span class="required">*</span></label>';
         echo '<select name="country" required>';
-        echo '<option value="">' . esc_html__('Select…', 'srp') . '</option>';
+        echo '<option value="">' . esc_html__('Select Country…', 'srp') . '</option>';
         foreach ((array)$countries as $code => $name) {
             echo '<option value="' . esc_attr($code) . '">' . esc_html($name) . '</option>';
         }
@@ -175,8 +175,8 @@ class SRP_Shortcodes {
         echo '</p>';
 
         echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Customer Type', 'srp') . ' <span class="required">*</span></label>'
-            . '<select name="type_id" required><option value="">' . esc_html__('Select…', 'srp') . '</option>';
+            . '<label>' . esc_html__('Type of Business', 'srp') . ' <span class="required">*</span></label>'
+            . '<select name="type_id" required><option value="">' . esc_html__('Select Business Type', 'srp') . '</option>';
         foreach ($types as $t) {
             echo '<option value="' . esc_attr((int)$t['id']) . '">' . esc_html($t['name']) . '</option>';
         }
@@ -184,16 +184,16 @@ class SRP_Shortcodes {
 
         echo '<p class="srp-full">'
             . '<label>' . esc_html__('Tax/VAT number', 'srp') . '</label>'
-            . '<input type="text" name="vat_number" placeholder="' . esc_attr__('Enter Your Tax/Vat Number', 'srp') . '" />'
+            . '<input type="text" name="vat_number"/>'
             . '</p>';
 
         echo '<p>'
             . '<label>' . esc_html__('Password', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="password" name="password" autocomplete="new-password" required placeholder="••••••" />'
+            . '<input type="password" name="password" autocomplete="new-password" required/>'
             . '</p>';
         echo '<p>'
             . '<label>' . esc_html__('Confirm Password', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="password" name="password2" autocomplete="new-password" required placeholder="••••••" />'
+            . '<input type="password" name="password2" autocomplete="new-password" required/>'
             . '</p>';
 
         echo '</div>';
