@@ -101,6 +101,35 @@ class SRP_Shortcodes {
                     update_user_meta($user_id, 'srp_phone', $phone);
                     update_user_meta($user_id, 'srp_country', $country);
 
+                    // --- Admin Email Notification Start ---
+                    $admin_email = get_option('admin_email');
+                    $site_name   = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+                    $subject     = sprintf(__('[%s] New B2B Account Pending Approval', 'srp'), $site_name);
+                    
+                    $type_name = '';
+                    foreach ($types as $t) {
+                        if ((int)$t['id'] === $type_id) {
+                            $type_name = $t['name'];
+                            break;
+                        }
+                    }
+
+                    $message  = __("A new business account has registered and is waiting for your approval.", 'srp') . "\n\n";
+                    $message .= __("Customer Details:", 'srp') . "\n";
+                    $message .= __("Name: ", 'srp') . $first . " " . $last . "\n";
+                    $message .= __("Email: ", 'srp') . $email . "\n";
+                    $message .= __("Company: ", 'srp') . $company . "\n";
+                    $message .= __("Phone: ", 'srp') . $phone . "\n";
+                    $message .= __("Business Type: ", 'srp') . $type_name . "\n";
+                    if ($vat !== '') {
+                        $message .= __("VAT/Tax Number: ", 'srp') . $vat . "\n";
+                    }
+                    $message .= "\n" . __("Review and approve this user here:", 'srp') . "\n";
+                    $message .= admin_url('admin.php?page=srp-smart-b2b-pricing&tab=users');
+
+                    wp_mail($admin_email, $subject, $message);
+                    // --- Admin Email Notification End ---
+
                     wp_set_current_user($user_id);
                     wp_set_auth_cookie($user_id);
 
@@ -113,99 +142,99 @@ class SRP_Shortcodes {
 
         if ($success) {
             echo '<div class="woocommerce-message" style="text-align:center">' . esc_html__('Registration complete. Your business account is pending approval. You can browse retail prices now; wholesale prices will appear after approval.', 'srp') . '</div>';
-        }
-
-        if (!empty($errors)) {
-            echo '<div class="woocommerce-error" role="alert"><ul>';
-            foreach ($errors as $e) {
-                echo '<li>' . esc_html($e) . '</li>';
+        } else {
+            if (!empty($errors)) {
+                echo '<div class="woocommerce-error" role="alert"><ul>';
+                foreach ($errors as $e) {
+                    echo '<li>' . esc_html($e) . '</li>';
+                }
+                echo '</ul></div>';
             }
-            echo '</ul></div>';
+
+            echo '<div class="srp-register-wrap">';
+            echo '<form method="post" class="srp-register-form">';
+            wp_nonce_field('srp_business_register', 'srp_business_register_nonce');
+
+            echo '<p style="display:none;">'
+                . '<label>Leave this field empty</label>'
+                . '<input type="text" name="srp_hp" value="" autocomplete="off" />'
+                . '</p>';
+
+            echo '<div class="srp-grid">';
+
+            echo '<p>'
+                . '<label>' . esc_html__('First Name', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="text" name="first_name" autocomplete="given-name" required/>'
+                . '</p>';
+
+            echo '<p>'
+                . '<label>' . esc_html__('Last Name', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="text" name="last_name" autocomplete="family-name" required />'
+                . '</p>';
+
+            echo '<p class="srp-full">'
+                . '<label>' . esc_html__('Email Address', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="email" name="email" autocomplete="email" required/>'
+                . '</p>';
+
+            echo '<p class="srp-full">'
+                . '<label>' . esc_html__('Company Name', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="text" name="company" required/>'
+                . '</p>';
+
+            echo '<p class="srp-full">'
+                . '<label>' . esc_html__('Address', 'srp') . ' <span class="required">*</span></label>'
+                . '<textarea name="address" rows="2" required></textarea>'
+                . '</p>';
+
+            echo '<p>'
+                . '<label>' . esc_html__('Contact Phone', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="text" name="contact_phone" required/>'
+                . '</p>';
+
+            echo '<p>'
+                . '<label>' . esc_html__('Country', 'srp') . ' <span class="required">*</span></label>';
+            echo '<select name="country" required>';
+            echo '<option value="">' . esc_html__('Select Country…', 'srp') . '</option>';
+            foreach ((array)$countries as $code => $name) {
+                echo '<option value="' . esc_attr($code) . '">' . esc_html($name) . '</option>';
+            }
+            echo '</select>';
+            echo '</p>';
+
+            echo '<p class="srp-full">'
+                . '<label>' . esc_html__('Type of Business', 'srp') . ' <span class="required">*</span></label>'
+                . '<select name="type_id" required><option value="">' . esc_html__('Select Business Type', 'srp') . '</option>';
+            foreach ($types as $t) {
+                echo '<option value="' . esc_attr((int)$t['id']) . '">' . esc_html($t['name']) . '</option>';
+            }
+            echo '</select></p>';
+
+            echo '<p class="srp-full">'
+                . '<label>' . esc_html__('Tax/VAT number', 'srp') . '</label>'
+                . '<input type="text" name="vat_number"/>'
+                . '</p>';
+
+            echo '<p>'
+                . '<label>' . esc_html__('Password', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="password" name="password" autocomplete="new-password" required/>'
+                . '</p>';
+            echo '<p>'
+                . '<label>' . esc_html__('Confirm Password', 'srp') . ' <span class="required">*</span></label>'
+                . '<input type="password" name="password2" autocomplete="new-password" required/>'
+                . '</p>';
+
+            echo '</div>';
+
+            echo '<p class="srp-actions">'
+                . '<button type="submit" class="button" name="register" value="Register">'
+                . esc_html__('Register', 'srp')
+                . '</button>'
+                . '</p>';
+
+            echo '</form>';
+            echo '</div>';
         }
-
-        echo '<div class="srp-register-wrap">';
-        echo '<form method="post" class="srp-register-form">';
-        wp_nonce_field('srp_business_register', 'srp_business_register_nonce');
-
-        echo '<p style="display:none;">'
-            . '<label>Leave this field empty</label>'
-            . '<input type="text" name="srp_hp" value="" autocomplete="off" />'
-            . '</p>';
-
-        echo '<div class="srp-grid">';
-
-        echo '<p>'
-            . '<label>' . esc_html__('First Name', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="first_name" autocomplete="given-name" required/>'
-            . '</p>';
-
-        echo '<p>'
-            . '<label>' . esc_html__('Last Name', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="last_name" autocomplete="family-name" required />'
-            . '</p>';
-
-        echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Email Address', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="email" name="email" autocomplete="email" required/>'
-            . '</p>';
-
-        echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Company Name', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="company" required/>'
-            . '</p>';
-
-        echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Address', 'srp') . ' <span class="required">*</span></label>'
-            . '<textarea name="address" rows="2" required></textarea>'
-            . '</p>';
-
-        echo '<p>'
-            . '<label>' . esc_html__('Contact Phone', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="text" name="contact_phone" required/>'
-            . '</p>';
-
-        echo '<p>'
-            . '<label>' . esc_html__('Country', 'srp') . ' <span class="required">*</span></label>';
-        echo '<select name="country" required>';
-        echo '<option value="">' . esc_html__('Select Country…', 'srp') . '</option>';
-        foreach ((array)$countries as $code => $name) {
-            echo '<option value="' . esc_attr($code) . '">' . esc_html($name) . '</option>';
-        }
-        echo '</select>';
-        echo '</p>';
-
-        echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Type of Business', 'srp') . ' <span class="required">*</span></label>'
-            . '<select name="type_id" required><option value="">' . esc_html__('Select Business Type', 'srp') . '</option>';
-        foreach ($types as $t) {
-            echo '<option value="' . esc_attr((int)$t['id']) . '">' . esc_html($t['name']) . '</option>';
-        }
-        echo '</select></p>';
-
-        echo '<p class="srp-full">'
-            . '<label>' . esc_html__('Tax/VAT number', 'srp') . '</label>'
-            . '<input type="text" name="vat_number"/>'
-            . '</p>';
-
-        echo '<p>'
-            . '<label>' . esc_html__('Password', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="password" name="password" autocomplete="new-password" required/>'
-            . '</p>';
-        echo '<p>'
-            . '<label>' . esc_html__('Confirm Password', 'srp') . ' <span class="required">*</span></label>'
-            . '<input type="password" name="password2" autocomplete="new-password" required/>'
-            . '</p>';
-
-        echo '</div>';
-
-        echo '<p class="srp-actions">'
-            . '<button type="submit" class="button" name="register" value="Register">'
-            . esc_html__('Register', 'srp')
-            . '</button>'
-            . '</p>';
-
-        echo '</form>';
-        echo '</div>';
 
         return ob_get_clean();
     }

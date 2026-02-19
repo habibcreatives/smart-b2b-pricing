@@ -246,18 +246,22 @@ public static function menu(): void {
                 }
             }
             if ($action === 'delete') {
-                $id = (int) ($_POST['id'] ?? 0);
-                if ($id) {
-                    $users_tbl = SRP_DB::tables()['users'];
-                    $cnt = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $users_tbl WHERE type_id=%d", $id));
-                    if ($cnt > 0) {
-                        echo '<div class="notice notice-error"><p>' . esc_html__('Cannot delete: users are assigned to this type. Reassign them first.', 'srp') . '</p></div>';
-                    } else {
-                        $wpdb->delete($t, ['id' => $id]);
-                        echo '<div class="notice notice-success"><p>' . esc_html__('Type deleted.', 'srp') . '</p></div>';
-                    }
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id) {
+                $users_tbl = SRP_DB::tables()['users'];
+                // JOIN with wp_users to count ONLY users that still exist in WordPress
+                $cnt = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(u.user_id) FROM $users_tbl u INNER JOIN {$wpdb->users} wu ON u.user_id = wu.ID WHERE u.type_id=%d", $id));
+                
+                if ($cnt > 0) {
+                    echo '<div class="notice notice-error"><p>' . esc_html__('Cannot delete: users are assigned to this type. Reassign them first.', 'srp') . '</p></div>';
+                } else {
+                    $wpdb->delete($t, ['id' => $id]);
+                    // Clean up orphaned records from srp_users table automatically
+                    $wpdb->query($wpdb->prepare("DELETE FROM $users_tbl WHERE type_id=%d", $id));
+                    echo '<div class="notice notice-success"><p>' . esc_html__('Type deleted.', 'srp') . '</p></div>';
                 }
             }
+        }
         }
 
         $rows = (array) $wpdb->get_results("SELECT * FROM $t ORDER BY name ASC", ARRAY_A);
@@ -315,6 +319,7 @@ public static function menu(): void {
             $action = sanitize_key($_POST['srp_user_action']);
             $user_id = (int) ($_POST['user_id'] ?? 0);
 
+            // Business User Edit Logic
             if ($user_id && $action === 'update') {
                 $type_id = isset($_POST['type_id']) ? (int) $_POST['type_id'] : null;
 
@@ -324,6 +329,18 @@ public static function menu(): void {
                 $wpdb->update($users_tbl, ['status' => $status, 'type_id' => $type_id], ['user_id' => $user_id]);
 
                 echo '<div class="notice notice-success"><p>' . esc_html__('User updated.', 'srp') . '</p></div>';
+            }
+
+            // Business User Delete Logic
+            if ($user_id && $action === 'delete') {
+                if (current_user_can('delete_users')) {
+                    require_once ABSPATH . 'wp-admin/includes/user.php';
+                    if (wp_delete_user($user_id)) {
+                        echo '<div class="notice notice-success"><p>' . esc_html__('User completely deleted.', 'srp') . '</p></div>';
+                    } else {
+                        echo '<div class="notice notice-error"><p>' . esc_html__('Failed to delete user.', 'srp') . '</p></div>';
+                    }
+                }
             }
         }
 
@@ -402,6 +419,8 @@ public static function menu(): void {
             echo '<td>' . self::render_status_badge((string) $r['status']) . '</td>';
             echo '<td>' . esc_html($r['vat_number'] ?? '') . '</td>';
             echo '<td>';
+            // Manage Business User
+            echo '<div style="display: flex; align-items: center; gap: 8px;">';
 
             echo '<button type="button" class="button srp-open-user-modal srp-edit-habib"'
                 . ' data-user-id="' . esc_attr($uid) . '"'
@@ -410,7 +429,17 @@ public static function menu(): void {
                 . ' data-name="' . esc_attr($label_for_modal) . '"'
                 . '>' . esc_html__('Manage', 'srp') . '</button>';
 
+            // Delete Business User
+            echo '<form method="post" style="margin: 0; padding: 0; display: flex;">';
+            wp_nonce_field('srp_users_action');
+            echo '<input type="hidden" name="srp_user_action" value="delete" />';
+            echo '<input type="hidden" name="user_id" value="' . esc_attr($uid) . '" />';
+            submit_button(__('Delete', 'srp'), 'srp-delete-habib delete button-small', 'submit', false, ['style' => 'margin: 0;', 'onclick' => "return confirm('Are you sure you want to completely delete this user?');"]);
+            echo '</form>';
+
+            echo '</div>';
             echo '</td>';
+
             echo '</tr>';
         }
 

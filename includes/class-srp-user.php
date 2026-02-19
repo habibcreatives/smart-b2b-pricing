@@ -3,6 +3,14 @@ if (!defined('ABSPATH')) { exit; }
 
 class SRP_User {
     public static function init(): void {
+        // Automatically delete B2B data when a user is deleted from WordPress
+        add_action('deleted_user', [__CLASS__, 'on_user_deleted']);
+    }
+
+    public static function on_user_deleted(int $user_id): void {
+        global $wpdb;
+        $t = self::tables()['users'];
+        $wpdb->delete($t, ['user_id' => $user_id]);
     }
 
     public static function tables() {
