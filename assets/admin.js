@@ -27,7 +27,8 @@
 
     openDialog($('#srp-user-modal'), (window.SRP_Admin && SRP_Admin.i18n ? SRP_Admin.i18n.manageUser : 'Manage User'));
   });
-$(document).on('click', '.srp-open-type-modal', function(){
+
+  $(document).on('click', '.srp-open-type-modal', function(){
     var d = $(this).data();
     $('#srp_type_id').val(d.id || '');
     $('#srp_type_name').val(d.name || '');
@@ -142,6 +143,59 @@ $(document).on('click', '.srp-open-type-modal', function(){
     $('#srp_rule_category_id, #srp_rule_brand_id, #srp_rule_product_id').on('change', function(){
       syncObjectId($('#srp_rule_scope').val(), '#srp_rule');
     });
+
+    // --- Drag and Drop Logic Start ---
+    
+    // Helper to fix table row width while dragging
+    var fixHelper = function(e, ui) {
+        ui.children().each(function() {
+            $(this).width($(this).width());
+        });
+        return ui;
+    };
+
+    // Sortable for Customer Types
+    if ($('.srp-sortable-types').length && $.fn.sortable) {
+        $('.srp-sortable-types').sortable({
+            helper: fixHelper,
+            cursor: 'move',
+            opacity: 0.8,
+            update: function(event, ui) {
+                var order = [];
+                $('.srp-sortable-types tr').each(function() {
+                    order.push($(this).data('id'));
+                });
+                
+                $.post(SRP_Admin.ajaxUrl, {
+                    action: 'srp_update_type_order',
+                    nonce: SRP_Admin.nonce,
+                    order: order
+                });
+            }
+        });
+    }
+
+    // Sortable for Pricing Rules
+    if ($('.srp-sortable-rules').length && $.fn.sortable) {
+        $('.srp-sortable-rules').sortable({
+            helper: fixHelper,
+            cursor: 'move',
+            opacity: 0.8,
+            update: function(event, ui) {
+                var order = [];
+                $('.srp-sortable-rules tr').each(function() {
+                    order.push($(this).data('id'));
+                });
+                
+                $.post(SRP_Admin.ajaxUrl, {
+                    action: 'srp_update_rule_order',
+                    nonce: SRP_Admin.nonce,
+                    order: order
+                });
+            }
+        });
+    }
+    // --- Drag and Drop Logic End ---
   });
 
   $(document).on('click', '.srp-open-rule-modal', function(){

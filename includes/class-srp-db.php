@@ -23,10 +23,12 @@ class SRP_DB {
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(190) NOT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'active',
+            menu_order INT NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
-            KEY status (status)
+            KEY status (status),
+            KEY menu_order (menu_order)
         ) $charset_collate;";
 
         $sql2 = "CREATE TABLE {$t['users']} (
@@ -50,10 +52,12 @@ class SRP_DB {
             rule_type VARCHAR(10) NOT NULL,
             value DECIMAL(18,6) NOT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'active',
+            menu_order INT NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id),
             KEY status (status),
+            KEY menu_order (menu_order),
             KEY type_scope (type_id, scope),
             KEY scope_object (scope, object_id)
         ) $charset_collate;";
@@ -64,10 +68,10 @@ class SRP_DB {
 
         $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$t['customer_types']}");
         if ($count === 0) {
-            $wpdb->insert($t['customer_types'], ['name' => 'Distributor', 'status' => 'active']);
-            $wpdb->insert($t['customer_types'], ['name' => 'Installer', 'status' => 'active']);
-            $wpdb->insert($t['customer_types'], ['name' => 'Electrician', 'status' => 'active']);
-            $wpdb->insert($t['customer_types'], ['name' => 'Freelancer', 'status' => 'active']);
+            $wpdb->insert($t['customer_types'], ['name' => 'Distributor', 'status' => 'active', 'menu_order' => 1]);
+            $wpdb->insert($t['customer_types'], ['name' => 'Installer', 'status' => 'active', 'menu_order' => 2]);
+            $wpdb->insert($t['customer_types'], ['name' => 'Electrician', 'status' => 'active', 'menu_order' => 3]);
+            $wpdb->insert($t['customer_types'], ['name' => 'Freelancer', 'status' => 'active', 'menu_order' => 4]);
         }
     }
 }

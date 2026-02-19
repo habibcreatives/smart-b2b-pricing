@@ -8,6 +8,10 @@ class SRP_Admin {
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
         add_action('wp_ajax_srp_search_users', [__CLASS__, 'ajax_search_users']);
         add_action('wp_ajax_srp_search_products', [__CLASS__, 'ajax_search_products']);
+        
+        // Drag and Drop AJAX Actions
+        add_action('wp_ajax_srp_update_type_order', [__CLASS__, 'ajax_update_type_order']);
+        add_action('wp_ajax_srp_update_rule_order', [__CLASS__, 'ajax_update_rule_order']);
     }
 
     public static function enqueue_assets(): void {
@@ -18,9 +22,10 @@ class SRP_Admin {
         wp_enqueue_script('jquery-ui-dialog');
         wp_enqueue_style('wp-jquery-ui-dialog');
         wp_enqueue_script('jquery-ui-autocomplete');
+        wp_enqueue_script('jquery-ui-sortable'); // Added for Drag and Drop
 
         wp_enqueue_style('srp-admin', SRP_PLUGIN_URL . 'assets/admin.css', [], SRP_VERSION);
-        wp_enqueue_script('srp-admin', SRP_PLUGIN_URL . 'assets/admin.js', ['jquery', 'jquery-ui-dialog', 'jquery-ui-autocomplete'], SRP_VERSION, true);
+        wp_enqueue_script('srp-admin', SRP_PLUGIN_URL . 'assets/admin.js', ['jquery', 'jquery-ui-dialog', 'jquery-ui-autocomplete', 'jquery-ui-sortable'], SRP_VERSION, true);
 
         wp_localize_script('srp-admin', 'SRP_Admin', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -32,6 +37,32 @@ class SRP_Admin {
             ],
         ]);
     }
+
+    // --- AJAX For Drag and Drop Order Save ---
+    public static function ajax_update_type_order(): void {
+        if (!current_user_can('manage_woocommerce')) wp_send_json_error(['message' => 'forbidden'], 403);
+        check_ajax_referer('srp_admin_nonce', 'nonce');
+        $order = isset($_POST['order']) ? (array) wp_unslash($_POST['order']) : [];
+        global $wpdb;
+        $t = SRP_DB::tables()['customer_types'];
+        foreach ($order as $index => $id) {
+            $wpdb->update($t, ['menu_order' => (int)$index], ['id' => (int)$id]);
+        }
+        wp_send_json_success();
+    }
+
+    public static function ajax_update_rule_order(): void {
+        if (!current_user_can('manage_woocommerce')) wp_send_json_error(['message' => 'forbidden'], 403);
+        check_ajax_referer('srp_admin_nonce', 'nonce');
+        $order = isset($_POST['order']) ? (array) wp_unslash($_POST['order']) : [];
+        global $wpdb;
+        $t = SRP_DB::tables()['rules'];
+        foreach ($order as $index => $id) {
+            $wpdb->update($t, ['menu_order' => (int)$index], ['id' => (int)$id]);
+        }
+        wp_send_json_success();
+    }
+    // -----------------------------------------
 
     public static function ajax_search_users(): void {
         if (!current_user_can('manage_woocommerce')) wp_send_json_error(['message' => 'forbidden'], 403);
@@ -119,7 +150,6 @@ class SRP_Admin {
         return $v;
     }
 
-    
     private static function render_status_badge(string $status): string {
         $st = sanitize_key($status);
         $label = ucfirst($st);
@@ -127,7 +157,7 @@ class SRP_Admin {
         return '<span class="' . esc_attr($class) . '">' . esc_html($label) . '</span>';
     }
 
-public static function menu(): void {
+    public static function menu(): void {
         add_submenu_page(
             'woocommerce',
             __('Smart B2B Pricing', 'srp'),
@@ -232,7 +262,9 @@ public static function menu(): void {
             if ($action === 'add') {
                 $name = sanitize_text_field($_POST['name'] ?? '');
                 if ($name) {
-                    $wpdb->insert($t, ['name' => $name, 'status' => 'active']);
+                    // Max order Find for New Sortning
+                    $max_order = (int) $wpdb->get_var("SELECT MAX(menu_order) FROM $t") + 1;
+                    $wpdb->insert($t, ['name' => $name, 'status' => 'active', 'menu_order' => $max_order]);
                     echo '<div class="notice notice-success"><p>' . esc_html__('Type added.', 'srp') . '</p></div>';
                 }
             }
@@ -249,14 +281,12 @@ public static function menu(): void {
             $id = (int) ($_POST['id'] ?? 0);
             if ($id) {
                 $users_tbl = SRP_DB::tables()['users'];
-                // JOIN with wp_users to count ONLY users that still exist in WordPress
                 $cnt = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(u.user_id) FROM $users_tbl u INNER JOIN {$wpdb->users} wu ON u.user_id = wu.ID WHERE u.type_id=%d", $id));
                 
                 if ($cnt > 0) {
                     echo '<div class="notice notice-error"><p>' . esc_html__('Cannot delete: users are assigned to this type. Reassign them first.', 'srp') . '</p></div>';
                 } else {
                     $wpdb->delete($t, ['id' => $id]);
-                    // Clean up orphaned records from srp_users table automatically
                     $wpdb->query($wpdb->prepare("DELETE FROM $users_tbl WHERE type_id=%d", $id));
                     echo '<div class="notice notice-success"><p>' . esc_html__('Type deleted.', 'srp') . '</p></div>';
                 }
@@ -264,7 +294,8 @@ public static function menu(): void {
         }
         }
 
-        $rows = (array) $wpdb->get_results("SELECT * FROM $t ORDER BY name ASC", ARRAY_A);
+        // Ordered by menu_order
+        $rows = (array) $wpdb->get_results("SELECT * FROM $t ORDER BY menu_order ASC, name ASC", ARRAY_A);
 
         echo '<h3>' . esc_html__('Add Customer Type', 'srp') . '</h3>';
         echo '<form method="post">';
@@ -274,10 +305,14 @@ public static function menu(): void {
         submit_button(__('Add Type', 'srp'));
         echo '</form>';
 
-        echo '<hr><h3>' . esc_html__('Existing Types', 'srp') . '</h3>';
-        echo '<table class="widefat striped"><thead><tr><th>' . esc_html__('Name', 'srp') . '</th><th>' . esc_html__('Status', 'srp') . '</th><th>' . esc_html__('Actions', 'srp') . '</th></tr></thead><tbody>';
+        echo '<hr><h3>' . esc_html__('Existing Types (Drag to reorder)', 'srp') . '</h3>';
+        echo '<table class="widefat striped"><thead><tr><th style="width:30px;"></th><th>' . esc_html__('Name', 'srp') . '</th><th>' . esc_html__('Status', 'srp') . '</th><th>' . esc_html__('Actions', 'srp') . '</th></tr></thead>';
+        // srp-sortable-types class added
+        echo '<tbody class="srp-sortable-types">';
         foreach ($rows as $r) {
-            echo '<tr>';
+            // data-id added for drag logic
+            echo '<tr data-id="' . esc_attr((int)$r['id']) . '">';
+            echo '<td style="cursor:move; text-align:center;"><span class="dashicons dashicons-menu" style="color:#aaa;"></span></td>';
             echo '<td>' . esc_html($r['name']) . '</td>';
             echo '<td>' . self::render_status_badge((string) $r['status']) . '</td>';
             echo '<td>';
@@ -310,6 +345,7 @@ public static function menu(): void {
         submit_button(__('Save', 'srp'), 'primary', 'submit', false);
         echo '</form></div>';
     }
+
     private static function render_users(): void {
         global $wpdb;
         $users_tbl = SRP_DB::tables()['users'];
@@ -419,6 +455,7 @@ public static function menu(): void {
             echo '<td>' . self::render_status_badge((string) $r['status']) . '</td>';
             echo '<td>' . esc_html($r['vat_number'] ?? '') . '</td>';
             echo '<td>';
+            
             // Manage Business User
             echo '<div style="display: flex; align-items: center; gap: 8px;">';
 
@@ -512,13 +549,16 @@ public static function menu(): void {
                 }
 
                 if ($type_id > 0 && $value >= 0) {
+                    // Find Max Order
+                    $max_order = (int) $wpdb->get_var("SELECT MAX(menu_order) FROM $rules_tbl") + 1;
                     $wpdb->insert($rules_tbl, [
                         'type_id' => $type_id,
                         'scope' => $scope,
                         'object_id' => $object_id,
                         'rule_type' => $rule_type,
                         'value' => $value,
-                        'status' => 'active'
+                        'status' => 'active',
+                        'menu_order' => $max_order
                     ]);
                     echo '<div class="notice notice-success"><p>' . esc_html__('Rule added.', 'srp') . '</p></div>';
                 } else {
@@ -625,9 +665,12 @@ public static function menu(): void {
         submit_button(__('Add Rule', 'srp'));
         echo '</form>';
 
-        $rows = (array) $wpdb->get_results("SELECT * FROM $rules_tbl ORDER BY id DESC LIMIT 200", ARRAY_A);
-        echo '<hr><h3>' . esc_html__('Existing Rules (latest 200)', 'srp') . '</h3>';
-        echo '<table class="widefat striped"><thead><tr><th>ID</th><th>Type/User</th><th>Scope</th><th>Target</th><th>Rule</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        // Ordered by menu_order
+        $rows = (array) $wpdb->get_results("SELECT * FROM $rules_tbl ORDER BY menu_order ASC, id DESC LIMIT 200", ARRAY_A);
+        echo '<hr><h3>' . esc_html__('Existing Rules (Drag to reorder)', 'srp') . '</h3>';
+        echo '<table class="widefat striped"><thead><tr><th style="width:30px;"></th><th>ID</th><th>Type/User</th><th>Scope</th><th>Target</th><th>Rule</th><th>Status</th><th>Action</th></tr></thead>';
+        // srp-sortable-rules class added
+        echo '<tbody class="srp-sortable-rules">';
         foreach ($rows as $r) {
             $scope = (string) $r['scope'];
             $type_or_user_label = '';
@@ -656,7 +699,9 @@ public static function menu(): void {
                 }
             }
 
-            echo '<tr>';
+            // data-id added for drag logic
+            echo '<tr data-id="' . esc_attr((int)$r['id']) . '">';
+            echo '<td style="cursor:move; text-align:center;"><span class="dashicons dashicons-menu" style="color:#aaa;"></span></td>';
             echo '<td>' . esc_html($r['id']) . '</td>';
             echo '<td>' . esc_html($type_or_user_label) . '</td>';
             echo '<td>' . esc_html($scope) . '</td>';

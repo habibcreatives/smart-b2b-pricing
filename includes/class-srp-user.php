@@ -20,11 +20,12 @@ class SRP_User {
     public static function get_customer_types(bool $only_active = true): array {
         global $wpdb;
         $t = self::tables()['customer_types'];
+        // For Serial of Drag and Drop - menu_order Add
         $sql = "SELECT id, name, status FROM $t";
         if ($only_active) {
             $sql .= " WHERE status='active'";
         }
-        $sql .= " ORDER BY name ASC";
+        $sql .= " ORDER BY menu_order ASC, name ASC";
         return (array) $wpdb->get_results($sql, ARRAY_A);
     }
 
