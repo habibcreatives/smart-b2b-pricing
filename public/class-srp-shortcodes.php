@@ -130,6 +130,26 @@ class SRP_Shortcodes {
                     wp_mail($admin_email, $subject, $message);
                     // --- Admin Email Notification End ---
 
+                    // --- Customer Pending Email Notification Start ---
+                    $customer_subject = sprintf(__('[%s] Your Business Account is Pending Approval', 'srp'), $site_name);
+                    
+                    if (function_exists('WC')) {
+                        $mailer = WC()->mailer();
+                        $customer_html = $mailer->wrap_message(
+                            __('Account Pending Approval', 'srp'),
+                            sprintf(
+                                __('<p>Hi %s,</p><p>Thank you for registering a business account on <strong>%s</strong>.</p><p>Your account is currently under review by our team. You will receive another email once your account has been approved and your wholesale pricing is activated.</p><p>Thank you!</p>', 'srp'), 
+                                $first, 
+                                $site_name
+                            )
+                        );
+                        $mailer->send($email, $customer_subject, $customer_html);
+                    } else {
+                        $customer_msg = sprintf(__("Hi %s,\n\nThank you for registering a business account on %s.\n\nYour account is currently under review by our team. You will receive another email once your account has been approved and your wholesale pricing is activated.\n\nThank you!", 'srp'), $first, $site_name);
+                        wp_mail($email, $customer_subject, $customer_msg);
+                    }
+                    // --- Customer Pending Email Notification End ---
+
                     wp_set_current_user($user_id);
                     wp_set_auth_cookie($user_id);
 

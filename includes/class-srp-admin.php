@@ -362,7 +362,40 @@ class SRP_Admin {
                 $status = sanitize_key($_POST['status'] ?? 'pending');
                 if (!in_array($status, ['pending','approved','rejected'], true)) $status = 'pending';
 
+                // Status check from database
+                $old_status = $wpdb->get_var($wpdb->prepare("SELECT status FROM $users_tbl WHERE user_id=%d", $user_id));
+
                 $wpdb->update($users_tbl, ['status' => $status, 'type_id' => $type_id], ['user_id' => $user_id]);
+
+                // --- Send Approval Email Start ---
+                // if status approved
+                if ($old_status !== 'approved' && $status === 'approved') {
+                    $user_info = get_userdata($user_id);
+                    if ($user_info) {
+                        $site_name = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+                        $subject = sprintf(__('[%s] Your Business Account has been Approved!', 'srp'), $site_name);
+                        $display_name = $user_info->first_name ? $user_info->first_name : $user_info->display_name;
+                        
+                        if (function_exists('WC')) {
+                            $mailer = WC()->mailer();
+                            $login_url = wc_get_page_permalink('myaccount');
+                            $html_message = $mailer->wrap_message(
+                                __('Account Approved', 'srp'),
+                                sprintf(
+                                    __('<p>Hi %s,</p><p>Great news! Your business account on <strong>%s</strong> has been approved.</p><p>You can now log in to view your exclusive B2B wholesale pricing.</p><p><a href="%s" style="display:inline-block; margin-top:10px; padding:10px 20px; background-color:#14C814; color:#ffffff; text-decoration:none; border-radius:4px; font-weight:bold;">Click here to log in</a></p><p>We look forward to doing business with you.</p>', 'srp'), 
+                                    $display_name, 
+                                    $site_name,
+                                    $login_url
+                                )
+                            );
+                            $mailer->send($user_info->user_email, $subject, $html_message);
+                        } else {
+                            $text_message = sprintf(__("Hi %s,\n\nGreat news! Your business account on %s has been approved.\n\nYou can now log in and view your exclusive B2B wholesale pricing.\n\nThank you!", 'srp'), $display_name, $site_name);
+                            wp_mail($user_info->user_email, $subject, $text_message);
+                        }
+                    }
+                }
+                // --- Send Approval Email End ---
 
                 echo '<div class="notice notice-success"><p>' . esc_html__('User updated.', 'srp') . '</p></div>';
             }
