@@ -22,6 +22,14 @@
 
     $('#srp_user_id').val($btn.attr('data-user-id') || '');
     $('#srp_user_name').val(name);
+    
+    // New Fields Population
+    $('#srp_user_company').val(String($btn.attr('data-company') || ''));
+    $('#srp_user_address').val(String($btn.attr('data-address') || ''));
+    $('#srp_user_phone').val(String($btn.attr('data-phone') || ''));
+    $('#srp_user_vat').val(String($btn.attr('data-vat') || ''));
+    $('#srp_user_country').val(String($btn.attr('data-country') || ''));
+    
     $('#srp_user_type').val(String($btn.attr('data-type-id') || 0));
     $('#srp_user_status').val(String($btn.attr('data-status') || 'pending'));
 
@@ -155,11 +163,14 @@
     };
 
     // Sortable for Customer Types
-    if ($('.srp-sortable-types').length && $.fn.sortable) {
+    if ($('.srp-sortable-types').length && typeof $.fn.sortable !== 'undefined') {
         $('.srp-sortable-types').sortable({
             helper: fixHelper,
             cursor: 'move',
             opacity: 0.8,
+            items: '> tr', 
+            handle: 'td:first-child', 
+            zIndex: 9999, 
             update: function(event, ui) {
                 var order = [];
                 $('.srp-sortable-types tr').each(function() {
@@ -176,11 +187,14 @@
     }
 
     // Sortable for Pricing Rules
-    if ($('.srp-sortable-rules').length && $.fn.sortable) {
+    if ($('.srp-sortable-rules').length && typeof $.fn.sortable !== 'undefined') {
         $('.srp-sortable-rules').sortable({
             helper: fixHelper,
             cursor: 'move',
             opacity: 0.8,
+            items: '> tr',
+            handle: 'td:first-child',
+            zIndex: 9999,
             update: function(event, ui) {
                 var order = [];
                 $('.srp-sortable-rules tr').each(function() {

@@ -12,7 +12,68 @@ class SRP_Admin {
         // Drag and Drop AJAX Actions
         add_action('wp_ajax_srp_update_type_order', [__CLASS__, 'ajax_update_type_order']);
         add_action('wp_ajax_srp_update_rule_order', [__CLASS__, 'ajax_update_rule_order']);
+
+        // Hook for CSV Export
+        add_action('admin_init', [__CLASS__, 'export_users_csv']);
     }
+
+    // --- Ultra Clean CSV Export Logic Start ---
+    public static function export_users_csv(): void {
+        if (isset($_GET['srp_export_csv']) && current_user_can('manage_woocommerce')) {
+            check_admin_referer('srp_export_csv_nonce');
+            
+            // Clean output buffer before anything else
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            global $wpdb;
+            $users_tbl = SRP_DB::tables()['users'];
+            $types = SRP_User::get_customer_types(false);
+
+            $sql = "SELECT u.*, wu.user_email, wu.display_name FROM $users_tbl u JOIN {$wpdb->users} wu ON wu.ID=u.user_id ORDER BY u.created_at DESC";
+            $rows = $wpdb->get_results($sql, ARRAY_A);
+
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="srp_business_users.csv"');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            
+            $output = fopen('php://output', 'w');
+            
+            // CSV Headers
+            fputcsv($output, ['Name', 'Email', 'Company', 'Address', 'Phone', 'Country', 'Type', 'Status', 'VAT Number', 'Registration Date']);
+
+            foreach ($rows as $r) {
+                $uid = (int)$r['user_id'];
+                $company = (string) get_user_meta($uid, 'srp_company', true);
+                $address = (string) get_user_meta($uid, 'srp_address', true);
+                $phone   = (string) get_user_meta($uid, 'srp_phone', true);
+                $country = (string) get_user_meta($uid, 'srp_country', true);
+                $vat     = (string) ($r['vat_number'] ?? '');
+                
+                $type_name = self::type_name($types, (int)$r['type_id']);
+                
+                // Pure RAW data without any quotes
+                fputcsv($output, [
+                    $r['display_name'],
+                    $r['user_email'],
+                    $company,
+                    $address,
+                    $phone,
+                    self::country_label($country),
+                    $type_name,
+                    $r['status'],
+                    $vat,
+                    $r['created_at']
+                ]);
+            }
+            
+            fclose($output);
+            exit;
+        }
+    }
+    // --- Ultra Clean CSV Export Logic End ---
 
     public static function enqueue_assets(): void {
         if (!current_user_can('manage_woocommerce')) return;
@@ -22,7 +83,7 @@ class SRP_Admin {
         wp_enqueue_script('jquery-ui-dialog');
         wp_enqueue_style('wp-jquery-ui-dialog');
         wp_enqueue_script('jquery-ui-autocomplete');
-        wp_enqueue_script('jquery-ui-sortable'); // Added for Drag and Drop
+        wp_enqueue_script('jquery-ui-sortable');
 
         wp_enqueue_style('srp-admin', SRP_PLUGIN_URL . 'assets/admin.css', [], SRP_VERSION);
         wp_enqueue_script('srp-admin', SRP_PLUGIN_URL . 'assets/admin.js', ['jquery', 'jquery-ui-dialog', 'jquery-ui-autocomplete', 'jquery-ui-sortable'], SRP_VERSION, true);
@@ -38,7 +99,6 @@ class SRP_Admin {
         ]);
     }
 
-    // --- AJAX For Drag and Drop Order Save ---
     public static function ajax_update_type_order(): void {
         if (!current_user_can('manage_woocommerce')) wp_send_json_error(['message' => 'forbidden'], 403);
         check_ajax_referer('srp_admin_nonce', 'nonce');
@@ -62,7 +122,6 @@ class SRP_Admin {
         }
         wp_send_json_success();
     }
-    // -----------------------------------------
 
     public static function ajax_search_users(): void {
         if (!current_user_can('manage_woocommerce')) wp_send_json_error(['message' => 'forbidden'], 403);
@@ -262,7 +321,6 @@ class SRP_Admin {
             if ($action === 'add') {
                 $name = sanitize_text_field($_POST['name'] ?? '');
                 if ($name) {
-                    // Max order Find for New Sortning
                     $max_order = (int) $wpdb->get_var("SELECT MAX(menu_order) FROM $t") + 1;
                     $wpdb->insert($t, ['name' => $name, 'status' => 'active', 'menu_order' => $max_order]);
                     echo '<div class="notice notice-success"><p>' . esc_html__('Type added.', 'srp') . '</p></div>';
@@ -294,7 +352,6 @@ class SRP_Admin {
         }
         }
 
-        // Ordered by menu_order
         $rows = (array) $wpdb->get_results("SELECT * FROM $t ORDER BY menu_order ASC, name ASC", ARRAY_A);
 
         echo '<h3>' . esc_html__('Add Customer Type', 'srp') . '</h3>';
@@ -307,10 +364,8 @@ class SRP_Admin {
 
         echo '<hr><h3>' . esc_html__('Existing Types (Drag to reorder)', 'srp') . '</h3>';
         echo '<table class="widefat striped"><thead><tr><th style="width:30px;"></th><th>' . esc_html__('Name', 'srp') . '</th><th>' . esc_html__('Status', 'srp') . '</th><th>' . esc_html__('Actions', 'srp') . '</th></tr></thead>';
-        // srp-sortable-types class added
         echo '<tbody class="srp-sortable-types">';
         foreach ($rows as $r) {
-            // data-id added for drag logic
             echo '<tr data-id="' . esc_attr((int)$r['id']) . '">';
             echo '<td style="cursor:move; text-align:center;"><span class="dashicons dashicons-menu" style="color:#aaa;"></span></td>';
             echo '<td>' . esc_html($r['name']) . '</td>';
@@ -355,20 +410,27 @@ class SRP_Admin {
             $action = sanitize_key($_POST['srp_user_action']);
             $user_id = (int) ($_POST['user_id'] ?? 0);
 
-            // Business User Edit Logic
             if ($user_id && $action === 'update') {
                 $type_id = isset($_POST['type_id']) ? (int) $_POST['type_id'] : null;
 
                 $status = sanitize_key($_POST['status'] ?? 'pending');
                 if (!in_array($status, ['pending','approved','rejected'], true)) $status = 'pending';
 
-                // Status check from database
+                $company = sanitize_text_field($_POST['company'] ?? '');
+                $address = sanitize_textarea_field($_POST['address'] ?? '');
+                $phone   = sanitize_text_field($_POST['phone'] ?? '');
+                $country = sanitize_text_field($_POST['country'] ?? '');
+                $vat     = sanitize_text_field($_POST['vat'] ?? '');
+
                 $old_status = $wpdb->get_var($wpdb->prepare("SELECT status FROM $users_tbl WHERE user_id=%d", $user_id));
 
-                $wpdb->update($users_tbl, ['status' => $status, 'type_id' => $type_id], ['user_id' => $user_id]);
+                $wpdb->update($users_tbl, ['status' => $status, 'type_id' => $type_id, 'vat_number' => $vat], ['user_id' => $user_id]);
 
-                // --- Send Approval Email Start ---
-                // if status approved
+                update_user_meta($user_id, 'srp_company', $company);
+                update_user_meta($user_id, 'srp_address', $address);
+                update_user_meta($user_id, 'srp_phone', $phone);
+                update_user_meta($user_id, 'srp_country', $country);
+
                 if ($old_status !== 'approved' && $status === 'approved') {
                     $user_info = get_userdata($user_id);
                     if ($user_info) {
@@ -395,12 +457,10 @@ class SRP_Admin {
                         }
                     }
                 }
-                // --- Send Approval Email End ---
 
-                echo '<div class="notice notice-success"><p>' . esc_html__('User updated.', 'srp') . '</p></div>';
+                echo '<div class="notice notice-success"><p>' . esc_html__('User updated successfully.', 'srp') . '</p></div>';
             }
 
-            // Business User Delete Logic
             if ($user_id && $action === 'delete') {
                 if (current_user_can('delete_users')) {
                     require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -437,9 +497,15 @@ class SRP_Admin {
         $sql = "SELECT u.*, wu.user_email, wu.display_name FROM $users_tbl u JOIN {$wpdb->users} wu ON wu.ID=u.user_id $where ORDER BY u.created_at DESC LIMIT 200";
         $rows = $params ? $wpdb->get_results($wpdb->prepare($sql, ...$params), ARRAY_A) : $wpdb->get_results($sql, ARRAY_A);
 
-        echo '<h3>' . esc_html__('Business Users', 'srp') . '</h3>';
+        // CSV Export URL Generation
+        $export_url = wp_nonce_url(admin_url('admin.php?page=srp-smart-b2b-pricing&srp_export_csv=1'), 'srp_export_csv_nonce');
 
-        echo '<form method="get" style="margin:10px 0;">';
+        echo '<div style="display:flex; justify-content:space-between; align-items:flex-end;">';
+        echo '<h3>' . esc_html__('Business Users', 'srp') . '</h3>';
+        echo '<a href="' . esc_url($export_url) . '" class="button srp-edit-habib" style="font-weight: 500; margin: 10px 0px; padding: 4px 15px 6px 15px !important; background: linear-gradient(114deg, rgba(59, 173, 227, 1) 0%, rgba(87, 111, 230, 1) 25%, rgba(152, 68, 183, 1) 51%, rgba(255, 53, 127, 1) 100%) !important;">' . esc_html__('Download Users In CSV File', 'srp') . '</a>';
+        echo '</div>';
+
+        echo '<form method="get" style="margin-bottom:10px;">';
         echo '<input type="hidden" name="page" value="srp-smart-b2b-pricing" />';
         echo '<input type="hidden" name="tab" value="users" />';
         echo '<select name="status"><option value="">' . esc_html__('All Statuses', 'srp') . '</option>';
@@ -456,7 +522,8 @@ class SRP_Admin {
         submit_button(__('Filter', 'srp'), 'secondary', '', false);
         echo '</form>';
 
-        echo '<table class="widefat striped"><thead><tr>'
+        echo '<div class="srp-users-table-wrapper" style="overflow-x: auto; background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; margin-top: 15px; box-shadow: 0 1px 1px rgba(0,0,0,.04);">';
+        echo '<table class="widefat striped srp-users-table" style="border: none; margin: 0; min-width: 1000px;"><thead><tr>'
             . '<th>' . esc_html__('Name', 'srp') . '</th>'
             . '<th>' . esc_html__('Email', 'srp') . '</th>'
             . '<th>' . esc_html__('Company', 'srp') . '</th>'
@@ -464,32 +531,32 @@ class SRP_Admin {
             . '<th>' . esc_html__('Country', 'srp') . '</th>'
             . '<th>' . esc_html__('Type', 'srp') . '</th>'
             . '<th>' . esc_html__('Status', 'srp') . '</th>'
-            . '<th>' . esc_html__('VAT', 'srp') . '</th>'
-            . '<th>' . esc_html__('Actions', 'srp') . '</th>'
+            . '<th style="white-space: nowrap; width: 160px;">' . esc_html__('Actions', 'srp') . '</th>'
             . '</tr></thead><tbody>';
 
         foreach ((array)$rows as $r) {
             $uid = (int)$r['user_id'];
             $company = (string) get_user_meta($uid, 'srp_company', true);
+            $address = (string) get_user_meta($uid, 'srp_address', true);
             $phone   = (string) get_user_meta($uid, 'srp_phone', true);
             $country = (string) get_user_meta($uid, 'srp_country', true);
 
             $display_name = (string) ($r['display_name'] ?: ('#' . $uid));
             $email = (string) ($r['user_email'] ?? '');
             $label_for_modal = trim($display_name . ($email ? ' — ' . $email : ''));
+            
+            $formatted_phone = nl2br(esc_html(wordwrap($phone, 14, "\n", true)));
 
             echo '<tr>';
-            echo '<td>' . esc_html($display_name) . '</td>';
-            echo '<td>' . esc_html($email) . '</td>';
-            echo '<td>' . esc_html($company) . '</td>';
-            echo '<td>' . esc_html($phone) . '</td>';
-            echo '<td>' . esc_html(self::country_label($country)) . '</td>';
-            echo '<td>' . esc_html(self::type_name($types, (int)$r['type_id'])) . '</td>';
-            echo '<td>' . self::render_status_badge((string) $r['status']) . '</td>';
-            echo '<td>' . esc_html($r['vat_number'] ?? '') . '</td>';
-            echo '<td>';
-            
-            // Manage Business User
+            echo '<td style="vertical-align: middle;">' . esc_html($display_name) . '</td>';
+            echo '<td style="vertical-align: middle; white-space: nowrap;">' . esc_html($email) . '</td>';
+            echo '<td style="vertical-align: middle;">' . esc_html($company) . '</td>';
+            echo '<td style="vertical-align: middle;">' . $formatted_phone . '</td>';
+            echo '<td style="vertical-align: middle;">' . esc_html(self::country_label($country)) . '</td>';
+            echo '<td style="vertical-align: middle;">' . esc_html(self::type_name($types, (int)$r['type_id'])) . '</td>';
+            echo '<td style="vertical-align: middle;">' . self::render_status_badge((string) $r['status']) . '</td>';
+
+            echo '<td style="vertical-align: middle; white-space: nowrap;">';
             echo '<div style="display: flex; align-items: center; gap: 8px;">';
 
             echo '<button type="button" class="button srp-open-user-modal srp-edit-habib"'
@@ -497,9 +564,13 @@ class SRP_Admin {
                 . ' data-type-id="' . esc_attr((int)$r['type_id']) . '"'
                 . ' data-status="' . esc_attr($r['status']) . '"'
                 . ' data-name="' . esc_attr($label_for_modal) . '"'
+                . ' data-company="' . esc_attr($company) . '"'
+                . ' data-address="' . esc_attr($address) . '"'
+                . ' data-phone="' . esc_attr($phone) . '"'
+                . ' data-country="' . esc_attr($country) . '"'
+                . ' data-vat="' . esc_attr($r['vat_number'] ?? '') . '"'
                 . '>' . esc_html__('Manage', 'srp') . '</button>';
 
-            // Delete Business User
             echo '<form method="post" style="margin: 0; padding: 0; display: flex;">';
             wp_nonce_field('srp_users_action');
             echo '<input type="hidden" name="srp_user_action" value="delete" />';
@@ -513,7 +584,9 @@ class SRP_Admin {
             echo '</tr>';
         }
 
-        echo '</tbody></table>';
+        echo '</tbody></table></div>';
+
+        $wc_countries = self::get_wc_countries();
 
         echo '<div id="srp-user-modal" title="' . esc_attr__('Manage User', 'srp') . '" style="display:none;">';
         echo '<form method="post" id="srp-user-modal-form">';
@@ -522,6 +595,26 @@ class SRP_Admin {
 
         echo '<p><label><strong>' . esc_html__('User', 'srp') . '</strong></label><br>';
         echo '<input type="text" id="srp_user_name" style="width:100%;" disabled /></p>';
+
+        echo '<p><label><strong>' . esc_html__('Company', 'srp') . '</strong></label><br>';
+        echo '<input type="text" name="company" id="srp_user_company" style="width:100%;" /></p>';
+
+        echo '<p><label><strong>' . esc_html__('Address', 'srp') . '</strong></label><br>';
+        echo '<textarea name="address" id="srp_user_address" style="width:100%;" rows="2"></textarea></p>';
+
+        echo '<p><label><strong>' . esc_html__('Phone', 'srp') . '</strong></label><br>';
+        echo '<input type="text" name="phone" id="srp_user_phone" style="width:100%;" /></p>';
+
+        echo '<p><label><strong>' . esc_html__('VAT Number', 'srp') . '</strong></label><br>';
+        echo '<input type="text" name="vat" id="srp_user_vat" style="width:100%;" /></p>';
+
+        echo '<p><label><strong>' . esc_html__('Country', 'srp') . '</strong></label><br>';
+        echo '<select name="country" id="srp_user_country" style="width:100%;">';
+        echo '<option value="">' . esc_html__('Select Country…', 'srp') . '</option>';
+        foreach ((array)$wc_countries as $code => $c_name) {
+            echo '<option value="' . esc_attr($code) . '">' . esc_html($c_name) . '</option>';
+        }
+        echo '</select></p>';
 
         echo '<p><label><strong>' . esc_html__('Type', 'srp') . '</strong></label><br>';
         echo '<select name="type_id" id="srp_user_type" style="width:100%;">';
@@ -582,7 +675,6 @@ class SRP_Admin {
                 }
 
                 if ($type_id > 0 && $value >= 0) {
-                    // Find Max Order
                     $max_order = (int) $wpdb->get_var("SELECT MAX(menu_order) FROM $rules_tbl") + 1;
                     $wpdb->insert($rules_tbl, [
                         'type_id' => $type_id,
@@ -698,11 +790,9 @@ class SRP_Admin {
         submit_button(__('Add Rule', 'srp'));
         echo '</form>';
 
-        // Ordered by menu_order
         $rows = (array) $wpdb->get_results("SELECT * FROM $rules_tbl ORDER BY menu_order ASC, id DESC LIMIT 200", ARRAY_A);
         echo '<hr><h3>' . esc_html__('Existing Rules (Drag to reorder)', 'srp') . '</h3>';
         echo '<table class="widefat striped"><thead><tr><th style="width:30px;"></th><th>ID</th><th>Type/User</th><th>Scope</th><th>Target</th><th>Rule</th><th>Status</th><th>Action</th></tr></thead>';
-        // srp-sortable-rules class added
         echo '<tbody class="srp-sortable-rules">';
         foreach ($rows as $r) {
             $scope = (string) $r['scope'];
@@ -732,7 +822,6 @@ class SRP_Admin {
                 }
             }
 
-            // data-id added for drag logic
             echo '<tr data-id="' . esc_attr((int)$r['id']) . '">';
             echo '<td style="cursor:move; text-align:center;"><span class="dashicons dashicons-menu" style="color:#aaa;"></span></td>';
             echo '<td>' . esc_html($r['id']) . '</td>';
