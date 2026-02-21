@@ -502,7 +502,7 @@ class SRP_Admin {
 
         echo '<div style="display:flex; justify-content:space-between; align-items:flex-end;">';
         echo '<h3>' . esc_html__('Business Users', 'srp') . '</h3>';
-        echo '<a href="' . esc_url($export_url) . '" class="button srp-edit-habib" style="font-weight: 500; margin: 10px 0px; padding: 4px 15px 6px 15px !important; background: linear-gradient(114deg, rgba(59, 173, 227, 1) 0%, rgba(87, 111, 230, 1) 25%, rgba(152, 68, 183, 1) 51%, rgba(255, 53, 127, 1) 100%) !important;">' . esc_html__('Download Users In CSV File', 'srp') . '</a>';
+        echo '<a href="' . esc_url($export_url) . '" class="button srp-edit-habib" style="font-weight: 500; margin: 10px 0px; padding: 4px 15px 6px 15px !important; background: linear-gradient( 35deg, rgba(59, 173, 227, 1) 0%, rgba(87, 111, 230, 1) 25%, rgba(152, 68, 183, 1) 51%, rgb(235 10 10) 100%) !important">' . esc_html__('Download Users In CSV File', 'srp') . '</a>';
         echo '</div>';
 
         echo '<form method="get" style="margin-bottom:10px;">';
