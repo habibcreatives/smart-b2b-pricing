@@ -119,6 +119,8 @@ class SRP_Shortcodes {
                     $message .= __("Name: ", 'srp') . $first . " " . $last . "\n";
                     $message .= __("Email: ", 'srp') . $email . "\n";
                     $message .= __("Company: ", 'srp') . $company . "\n";
+                    $country_name = isset($countries[$country]) ? $countries[$country] : $country;
+                    $message .= __("Country: ", 'srp') . $country_name . "\n";
                     $message .= __("Phone: ", 'srp') . $phone . "\n";
                     $message .= __("Business Type: ", 'srp') . $type_name . "\n";
                     if ($vat !== '') {
@@ -161,7 +163,7 @@ class SRP_Shortcodes {
         ob_start();
 
         if ($success) {
-            echo '<div class="woocommerce-message" style="text-align:center">' . esc_html__('Registration complete. Your business account is pending approval. You can browse retail prices now; wholesale prices will appear after approval.', 'srp') . '</div>';
+            echo '<div class="woocommerce-message" style="text-align:center; padding: 135px 0px;">' . esc_html__('Registration complete. Your business account is pending approval. You can browse retail prices now; wholesale prices will appear after approval.', 'srp') . '</div>';
         } else {
             if (!empty($errors)) {
                 echo '<div class="woocommerce-error" role="alert"><ul>';
